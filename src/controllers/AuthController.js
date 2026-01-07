@@ -78,6 +78,15 @@ class AuthController {
             res.status(400).json({ message: this.formatError(error) });
         }
     };
+
+    getProfile = async (req, res) => {
+        try {
+            const result = await this.authService.getProfile(req.user._id);
+            res.json(result);
+        } catch (error) {
+            res.status(404).json({ message: this.formatError(error) });
+        }
+    };
 }
 
 module.exports = AuthController;

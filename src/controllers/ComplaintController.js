@@ -6,6 +6,7 @@ class ComplaintController {
     create = async (req, res) => {
         try {
             const { title, description, category, type, isAnonymous, image } = req.body;
+            const user = req.user;
 
             const complaintData = {
                 title,
@@ -13,19 +14,11 @@ class ComplaintController {
                 category,
                 type,
                 isAnonymous,
-                imageUrl: image
+                imageUrl: image,
+                collegeId: user.collegeId._id || user.collegeId,
+                hostelId: user.hostelId || req.body.hostelId,
+                studentId: user._id // Always store, masking happens in Service for admins
             };
-
-            // If not anonymous, attach student ID from the authenticated user
-            // Note: middleware should attach user to req.user if logged in
-            if (!isAnonymous && req.user) {
-                complaintData.studentId = req.user.id;
-                complaintData.hostelId = req.user.hostelId; // Assuming user has hostelId
-            } else if (isAnonymous) {
-                // Even anonymous might need a hostelId if passed from frontend context
-                // But for strict anonymity we might not track it, or track it loosely
-                if (req.body.hostelId) complaintData.hostelId = req.body.hostelId;
-            }
 
             const complaint = await this.complaintService.createComplaint(complaintData);
             res.status(201).json(complaint);
@@ -34,24 +27,20 @@ class ComplaintController {
         }
     };
 
-    getAll = async (req, res) => {
+    getStudentComplaints = async (req, res) => {
         try {
-            // Admin might want to filter
-            const filters = {};
+            const complaints = await this.complaintService.getStudentComplaints(req.user._id);
+            res.json(complaints);
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    };
 
-            // Role based filtering logic could arguably be in Service, but Controller prepares the request
-            if (req.user.role === 'hostel_admin') {
-                // This logic could be improved with more strict service methods, but keeping simple for now
-                filters.type = 'Hostel';
-            }
-            if (req.user.role === 'mess_admin') {
-                filters.type = 'Mess';
-            }
-            if (req.user.role === 'student') {
-                filters.studentId = req.user.id;
-            }
-
-            const complaints = await this.complaintService.getAllComplaints(filters);
+    getAdminComplaints = async (req, res) => {
+        try {
+            const user = req.user;
+            const collegeId = user.collegeId._id || user.collegeId;
+            const complaints = await this.complaintService.getAdminComplaints(collegeId, user.role);
             res.json(complaints);
         } catch (error) {
             res.status(500).json({ message: error.message });
@@ -62,7 +51,13 @@ class ComplaintController {
         try {
             const { id } = req.params;
             const { status, remark } = req.body;
-            const updated = await this.complaintService.updateComplaintStatus(id, status, remark);
+            const updated = await this.complaintService.updateStatus(
+                id,
+                status,
+                req.user._id,
+                req.user.role,
+                remark
+            );
             res.json(updated);
         } catch (error) {
             res.status(400).json({ message: error.message });

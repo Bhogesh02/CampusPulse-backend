@@ -56,11 +56,24 @@ const complaintSchema = new mongoose.Schema({
         default: ''
     },
 
+    // Scoping
+    collegeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'College',
+        required: true
+    },
+
     // Tracking
     hostelId: {
         type: String,
         required: false
     },
+    history: [{
+        status: String,
+        updatedAt: { type: Date, default: Date.now },
+        updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        remark: String
+    }],
     createdAt: {
         type: Date,
         default: Date.now

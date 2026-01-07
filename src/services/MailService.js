@@ -106,6 +106,67 @@ class MailService {
         `;
         return this.sendMail(to, subject, text, html);
     }
+
+    async sendInvitationEmail(to, collegeName, role, inviteUrl) {
+        const subject = `Invitation to join ${collegeName}`;
+        const normalizedRole = role.replace('_', ' ').toUpperCase();
+        const text = `Hello,\n\nYou have been invited to join ${collegeName} as a ${normalizedRole}.\nComplete your registration by clicking the link below:\n${inviteUrl}\n\nThis link will expire in 48 hours.`;
+        const html = `
+            <div style="font-family: Arial, sans-serif; padding: 30px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="color: #2563eb; margin: 0;">CampusPulse</h1>
+                </div>
+                <h2 style="color: #1e293b; text-align: center;">You're Invited!</h2>
+                <p>Hello,</p>
+                <p>You have been formally invited to join <b>${collegeName}</b> as a <b>${normalizedRole}</b>.</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${inviteUrl}" style="background-color: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Complete Registration</a>
+                </div>
+                <p>Or use this direct link:</p>
+                <p style="background: #f1f5f9; padding: 12px; border-radius: 6px; font-size: 0.85em; word-break: break-all; color: #475569;">
+                    <a href="${inviteUrl}">${inviteUrl}</a>
+                </p>
+                <div style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 0.85rem; color: #64748b;">
+                    <p><b>Note:</b> This invitation link is valid for 48 hours. Please complete your registration before then.</p>
+                </div>
+            </div>
+        `;
+        return this.sendMail(to, subject, text, html);
+    }
+
+    async sendScheduleNotification(to, collegeName, weekStartDate) {
+        const subject = `New Mess Menu: Week of ${new Date(weekStartDate).toLocaleDateString()}`;
+        const text = `The mess schedule for ${collegeName} starting ${weekStartDate} has been uploaded. Check it on the portal.`;
+        const html = `
+            <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h2 style="color: #2563eb;">New Mess Menu Published</h2>
+                <p>Hello Student,</p>
+                <p>The weekly mess schedule for <b>${collegeName}</b> (Week of ${new Date(weekStartDate).toLocaleDateString()}) is now available.</p>
+                <p>Please check the CampusPulse portal to see today's breakfast, lunch, and dinner options.</p>
+                <br>
+                <p>Bon Appétit!</p>
+            </div>
+        `;
+        return this.sendMail(to, subject, text, html);
+    }
+
+    async sendComplaintStatusUpdate(to, complaintTitle, status, remark) {
+        const subject = `Status Update: ${complaintTitle}`;
+        const text = `The status of your complaint "${complaintTitle}" has been updated to ${status}. Remark: ${remark}`;
+        const html = `
+            <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h2 style="color: #0f172a;">Complaint Update</h2>
+                <p>Hello,</p>
+                <p>There is an update on your complaint: <b>"${complaintTitle}"</b></p>
+                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 0;"><b>New Status:</b> <span style="text-transform: uppercase; color: #2563eb;">${status}</span></p>
+                    <p style="margin: 10px 0 0 0;"><b>Admin Remark:</b> ${remark || 'Action in progress.'}</p>
+                </div>
+                <p>Check your dashboard for full history.</p>
+            </div>
+        `;
+        return this.sendMail(to, subject, text, html);
+    }
 }
 
 module.exports = MailService;

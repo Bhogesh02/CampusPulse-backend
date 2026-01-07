@@ -2,20 +2,30 @@ const crypto = require('crypto');
 const generateToken = require('../utils/generateToken');
 
 class AuthService {
-    constructor(userRepository, collegeRepository, mailService) {
+    constructor(userRepository, collegeRepository, mailService, inviteRepository) {
         this.userRepository = userRepository;
         this.collegeRepository = collegeRepository;
         this.mailService = mailService;
+        this.inviteRepository = inviteRepository;
     }
 
     // --- Helper to finalize auth response ---
     async _finalizeAuth(user) {
         const token = generateToken(user._id, user.role);
+
+        let collegeName = '';
+        if (user.collegeId) {
+            const college = await this.collegeRepository.findById(user.collegeId);
+            collegeName = college?.name || '';
+        }
+
         return {
             _id: user._id,
             name: user.name,
             email: user.email,
             role: user.role,
+            collegeId: user.collegeId,
+            collegeName,
             token,
         };
     }
@@ -56,7 +66,7 @@ class AuthService {
 
     // --- 2. Student Registration ---
     async registerStudent(data) {
-        const { collegeName, email, mobile, studentId, firstName, lastName, password } = data;
+        const { collegeName, email, mobile, studentId, firstName, lastName, password, token } = data;
 
         // Simple validation: College must exist
         const college = await this.collegeRepository.findByName(collegeName);
@@ -77,6 +87,10 @@ class AuthService {
             collegeId: college._id
         });
 
+        if (token) {
+            await this.inviteRepository.model.updateOne({ token }, { status: 'accepted' });
+        }
+
         await this.mailService.sendWelcomeEmail(email, user.name, 'Student');
 
         return this._finalizeAuth(user);
@@ -84,7 +98,7 @@ class AuthService {
 
     // --- 3. Hostel Admin Registration ---
     async registerHostelAdmin(data) {
-        const { firstName, lastName, email, mobile, staffId, password, collegeName } = data;
+        const { firstName, lastName, email, mobile, staffId, password, collegeName, token } = data;
 
         // Simple validation: College must exist
         const college = await this.collegeRepository.findByName(collegeName);
@@ -105,6 +119,10 @@ class AuthService {
             collegeId: college._id
         });
 
+        if (token) {
+            await this.inviteRepository.model.updateOne({ token }, { status: 'accepted' });
+        }
+
         await this.mailService.sendWelcomeEmail(email, user.name, 'Hostel Admin');
 
         return this._finalizeAuth(user);
@@ -112,7 +130,7 @@ class AuthService {
 
     // --- 4. Mess Admin Registration ---
     async registerMessAdmin(data) {
-        const { firstName, lastName, email, mobile, staffId, password, collegeName } = data;
+        const { firstName, lastName, email, mobile, staffId, password, collegeName, token } = data;
 
         // Simple validation: College must exist
         const college = await this.collegeRepository.findByName(collegeName);
@@ -132,6 +150,10 @@ class AuthService {
             mobile,
             collegeId: college._id
         });
+
+        if (token) {
+            await this.inviteRepository.model.updateOne({ token }, { status: 'accepted' });
+        }
 
         await this.mailService.sendWelcomeEmail(email, user.name, 'Mess Admin');
 
@@ -234,6 +256,12 @@ class AuthService {
         } else {
             throw new Error('Invalid email or password');
         }
+    }
+
+    async getProfile(userId) {
+        const user = await this.userRepository.model.findById(userId).populate('collegeId').select('-password');
+        if (!user) throw new Error('User not found');
+        return user;
     }
 }
 

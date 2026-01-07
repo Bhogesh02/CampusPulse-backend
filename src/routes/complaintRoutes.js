@@ -4,12 +4,16 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Public / Anonymous (or at least no auth required for anonymous submit)
-router.post('/anonymous', complaintController.create);
+// Raise complaint
+router.post('/', protect, authorize('student'), complaintController.create);
 
-// Protected Routes
-router.post('/', protect, complaintController.create);
-router.get('/', protect, complaintController.getAll);
+// Get student's own complaints
+router.get('/student', protect, authorize('student'), complaintController.getStudentComplaints);
+
+// Get admin's assigned complaints
+router.get('/admin', protect, authorize('super_admin', 'hostel_admin', 'mess_admin'), complaintController.getAdminComplaints);
+
+// Update status
 router.put('/:id/status', protect, authorize('super_admin', 'hostel_admin', 'mess_admin'), complaintController.updateStatus);
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const express = require('express');
 const { authController } = require('../utils/diContainer');
+const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -11,6 +12,9 @@ router.post('/register/mess-admin', authController.registerMessAdmin);
 
 // Common Login Route
 router.post('/login', authController.login);
+
+// Profile Route
+router.get('/profile', protect, authController.getProfile);
 
 // Password Reset Routes
 router.post('/forgot-password', authController.forgotPassword);
