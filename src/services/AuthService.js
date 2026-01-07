@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const generateToken = require('../utils/generateToken');
 
 class AuthService {
@@ -83,7 +84,13 @@ class AuthService {
 
     // --- 3. Hostel Admin Registration ---
     async registerHostelAdmin(data) {
-        const { firstName, lastName, email, mobile, staffId, password } = data;
+        const { firstName, lastName, email, mobile, staffId, password, collegeName } = data;
+
+        // Simple validation: College must exist
+        const college = await this.collegeRepository.findByName(collegeName);
+        if (!college) {
+            throw new Error('College not found. Please ask your admin to register the college first.');
+        }
 
         const userExists = await this.userRepository.findByEmail(email);
         if (userExists) throw new Error('Email already registered');
@@ -94,7 +101,8 @@ class AuthService {
             password,
             role: 'hostel_admin',
             staffId,
-            mobile
+            mobile,
+            collegeId: college._id
         });
 
         await this.mailService.sendWelcomeEmail(email, user.name, 'Hostel Admin');
@@ -104,7 +112,13 @@ class AuthService {
 
     // --- 4. Mess Admin Registration ---
     async registerMessAdmin(data) {
-        const { firstName, lastName, email, mobile, staffId, password } = data;
+        const { firstName, lastName, email, mobile, staffId, password, collegeName } = data;
+
+        // Simple validation: College must exist
+        const college = await this.collegeRepository.findByName(collegeName);
+        if (!college) {
+            throw new Error('College not found. Please ask your admin to register the college first.');
+        }
 
         const userExists = await this.userRepository.findByEmail(email);
         if (userExists) throw new Error('Email already registered');
@@ -115,10 +129,77 @@ class AuthService {
             password,
             role: 'mess_admin',
             staffId,
-            mobile
+            mobile,
+            collegeId: college._id
         });
 
         await this.mailService.sendWelcomeEmail(email, user.name, 'Mess Admin');
+
+        return this._finalizeAuth(user);
+    }
+
+    // --- 5. Forgot Password ---
+    async forgotPassword(email) {
+        if (!email) throw new Error('Please provide an email address');
+
+        const user = await this.userRepository.findByEmail(email);
+        if (!user) {
+            throw new Error('No user found with this email');
+        }
+
+        // Generate Reset Token
+        const resetToken = crypto.randomBytes(20).toString('hex');
+
+        // Hash token and save to DB
+        user.resetPasswordToken = crypto
+            .createHash('sha256')
+            .update(resetToken)
+            .digest('hex');
+
+        // Expire in 5 minutes
+        user.resetPasswordExpire = Date.now() + 5 * 60 * 1000;
+
+        await user.save({ validateBeforeSave: false });
+
+        // Create Reset URL
+        // Ensure FRONTEND_URL is set in .env without trailing slash
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+        try {
+            await this.mailService.sendPasswordResetEmail(user.email, user.name, resetUrl);
+            return { message: 'Password reset email sent' };
+        } catch (error) {
+            user.resetPasswordToken = undefined;
+            user.resetPasswordExpire = undefined;
+            await user.save({ validateBeforeSave: false });
+            throw new Error('Email could not be sent');
+        }
+    }
+
+    // --- 6. Reset Password ---
+    async resetPassword(token, newPassword) {
+        // Hash token to verify
+        const resetPasswordToken = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        const user = await this.userRepository.model.findOne({
+            resetPasswordToken,
+            resetPasswordExpire: { $gt: Date.now() },
+        });
+
+        if (!user) {
+            throw new Error('Invalid token or token has expired');
+        }
+
+        // Set new password
+        user.password = newPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+
+        await user.save(); // Pre-save hook will hash the new password
 
         return this._finalizeAuth(user);
     }
@@ -128,8 +209,7 @@ class AuthService {
         const user = await this.userRepository.findByEmail(email);
 
         if (user && (await user.matchPassword(password))) {
-            // STRICT ROLE CHECK: Ensure user is logging into the dashboard meant for their role
-            // Map frontend URL roles to backend DB roles if they differ
+            // STRICT ROLE CHECK
             const backendRoleMap = {
                 'student': 'student',
                 'super-admin': 'super_admin',
@@ -140,8 +220,14 @@ class AuthService {
             const expectedRole = backendRoleMap[role] || role;
 
             if (user.role !== expectedRole) {
-                // If checking for 'admin' generic access or specific
                 throw new Error(`Unauthorized: This account is not a ${role.replace('-', ' ')} account.`);
+            }
+
+            // Send Login Alert
+            try {
+                await this.mailService.sendLoginAlert(user.email, user.name);
+            } catch (mailError) {
+                console.error("Failed to send login alert:", mailError.message);
             }
 
             return this._finalizeAuth(user);

@@ -10,6 +10,23 @@ const connectDB = async () => {
 
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
         console.log(`📦 Database Name: ${conn.connection.name}`);
+
+        // --- ONE-TIME FIX: Drop problematic 'username_1' index if it exists ---
+        try {
+            const usersCollection = conn.connection.db.collection('users');
+            const indexes = await usersCollection.indexes();
+            const usernameIndex = indexes.find(idx => idx.name === 'username_1');
+
+            if (usernameIndex) {
+                console.log('⚠️ Found legacy "username_1" index. Dropping it to prevent duplicate null errors...');
+                await usersCollection.dropIndex('username_1');
+                console.log('✅ "username_1" index dropped successfully. You can now register users without usernames.');
+            }
+        } catch (err) {
+            // Ignore errors (like if collection doesn't exist yet)
+            console.log('ℹ️ Index check skipped:', err.message);
+        }
+        // ----------------------------------------------------------------------
     } catch (error) {
         console.error(`❌ MongoDB Connection Error: ${error.message}`);
         console.error('🔍 Full Error Stack:', error.stack);

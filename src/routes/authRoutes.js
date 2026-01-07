@@ -12,4 +12,8 @@ router.post('/register/mess-admin', authController.registerMessAdmin);
 // Common Login Route
 router.post('/login', authController.login);
 
+// Password Reset Routes
+router.post('/forgot-password', authController.forgotPassword);
+router.put('/reset-password/:token', authController.resetPassword);
+
 module.exports = router;
